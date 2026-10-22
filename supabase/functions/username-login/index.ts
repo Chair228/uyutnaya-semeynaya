@@ -17,10 +17,14 @@ Deno.serve(async req=>{
 
     const admin=createClient(url,service,{auth:{persistSession:false,autoRefreshToken:false}});
     const {data:profile,error:lookupError}=await admin.from('profiles').select('id').eq('username',username).maybeSingle();
-    if(lookupError||!profile)return new Response(JSON.stringify({error:'Неверный логин или пароль'}),{status:401,headers:cors});
-    const {data:userResult,error:userError}=await admin.auth.admin.getUserById(profile.id);
-    const email=userResult?.user?.email;
-    if(userError||!email)return new Response(JSON.stringify({error:'Неверный логин или пароль'}),{status:401,headers:cors});
+    if(lookupError)throw lookupError;
+    let email=`${username}@accounts.uyutnaya-semeynaya.invalid`;
+    if(profile){
+      const {data:userResult,error:userError}=await admin.auth.admin.getUserById(profile.id);
+      if(userError)throw userError;
+      if(!userResult?.user?.email)return new Response(JSON.stringify({error:'Неверный логин или пароль'}),{status:401,headers:cors});
+      email=userResult.user.email;
+    }
 
     const auth=createClient(url,anon,{auth:{persistSession:false,autoRefreshToken:false}});
     const {data,error}=await auth.auth.signInWithPassword({email,password});
