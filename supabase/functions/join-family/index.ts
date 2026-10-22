@@ -9,9 +9,16 @@ Deno.serve(async req=>{
   const url=Deno.env.get('SUPABASE_URL')!,anon=Deno.env.get('SUPABASE_ANON_KEY')!,service=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const bearer=req.headers.get('Authorization');if(!bearer?.startsWith('Bearer '))return new Response(JSON.stringify({error:'Sign in first'}),{status:401,headers:cors});
   const userClient=createClient(url,anon,{global:{headers:{Authorization:bearer}}});const {data:{user},error:authError}=await userClient.auth.getUser();if(authError||!user)return new Response(JSON.stringify({error:'Invalid session'}),{status:401,headers:cors});
-  const body=await req.json();const code=String(body.invite_code||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,20);const displayName=String(body.display_name||user.user_metadata?.display_name||'').trim().slice(0,60);
-  if(code.length<16||displayName.length<1)return new Response(JSON.stringify({error:'Check the invite code and your name'}),{status:400,headers:cors});
-  const admin=createClient(url,service,{auth:{persistSession:false,autoRefreshToken:false}});const {data,error}=await admin.rpc('join_family_for_user',{p_user_id:user.id,p_invite_code:code,p_display_name:displayName});if(error)throw error;
+  const body=await req.json();const code=String(body.invite_code||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');const displayName=String(body.display_name||user.user_metadata?.display_name||'').trim().slice(0,60);
+  if(code.length!==24)return new Response(JSON.stringify({error:'Код семьи должен состоять из 24 символов. Попросите владельца скопировать его заново.'}),{status:400,headers:cors});
+  if(displayName.length<1)return new Response(JSON.stringify({error:'Укажите имя для семейного профиля.'}),{status:400,headers:cors});
+  const admin=createClient(url,service,{auth:{persistSession:false,autoRefreshToken:false}});const {data,error}=await admin.rpc('join_family_for_user',{p_user_id:user.id,p_invite_code:code,p_display_name:displayName});if(error){
+    const detail=error.message||'';
+    if(/invite code is invalid/i.test(detail))return new Response(JSON.stringify({error:'Код не найден. Проверьте, что он скопирован полностью и относится к нужной семье.'}),{status:400,headers:cors});
+    if(/already belongs to a family/i.test(detail))return new Response(JSON.stringify({error:'Этот аккаунт уже состоит в семейном круге.'}),{status:409,headers:cors});
+    if(/already has 25 members/i.test(detail))return new Response(JSON.stringify({error:'В этом семейном круге уже достигнут лимит участников.'}),{status:400,headers:cors});
+    throw error;
+  }
   return new Response(JSON.stringify(data),{status:200,headers:cors});
  }catch(error){const message=error instanceof Error?error.message:'Could not join family';console.error('join-family failed',message);return new Response(JSON.stringify({error:message}),{status:400,headers:cors});}
 });
