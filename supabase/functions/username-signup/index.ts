@@ -25,11 +25,11 @@ Deno.serve(async req=>{
     const setup=body.family_setup&&typeof body.family_setup==='object'?body.family_setup:{};
     const mode=setup.mode==='create'?'create':setup.mode==='join'?'join':null;
     const familyName=String(setup.familyName||'').trim().slice(0,60);
-    const inviteCode=String(setup.code||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,20);
+    const inviteCode=String(setup.code||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
     if(!/^[a-z0-9_]{3,20}$/.test(username))return response({error:'Логин: 3–20 латинских букв, цифр или _'},400,cors);
     if(password.length<8||password.length>72)return response({error:'Пароль должен содержать от 8 до 72 символов'},400,cors);
     if(displayName.length<2)return response({error:'Введите имя длиной не менее 2 символов'},400,cors);
-    if(!mode||(mode==='create'&&familyName.length<2)||(mode==='join'&&inviteCode.length<16))return response({error:'Сначала укажите, создать семейный круг или присоединиться к нему'},400,cors);
+    if(!mode||(mode==='create'&&familyName.length<2)||(mode==='join'&&inviteCode.length!==24))return response({error:mode==='join'?'Код семьи должен состоять из 24 символов. Проверьте код и попробуйте снова.':'Сначала укажите, создать семейный круг или присоединиться к нему'},400,cors);
 
     const forwarded=req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()||req.headers.get('cf-connecting-ip')||'unknown';
     const keyMaterial=new TextEncoder().encode(`${service}:${forwarded}`);
